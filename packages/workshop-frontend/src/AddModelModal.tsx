@@ -173,6 +173,7 @@ export default function AddModelModal({ visible, onCancel, onSuccess, authentica
     if (gatewayMode && showCredentials && selection && !isOllama && !isCloudflare &&
         !apiUrl.trim()) {
       newErrors.apiUrl = 'Please enter the direct API URL'
+      setAdvancedOpen(true)
     }
 
     setErrors(newErrors)
@@ -352,7 +353,9 @@ export default function AddModelModal({ visible, onCancel, onSuccess, authentica
                   placeholder="https://..."
                   description="Override the default API endpoint (useful for proxies like Cloudflare AI Gateway)"
                   value={apiUrl}
-                  onChange={(e) => setApiUrl(e.target.value)}
+                  onChange={(e) => { setApiUrl(e.target.value); setErrors(prev => ({ ...prev, apiUrl: '' })) }}
+                  error={errors.apiUrl}
+                  variant={errors.apiUrl ? 'error' : 'default'}
                 />
               </Collapsible.DefaultPanel>
             </Collapsible.Root>
