@@ -17,6 +17,7 @@ import {
   classifyWorkspaceOpenFailure,
   type WorkspaceOpenFailureKind,
 } from './components/WorkspaceOpenErrorPage'
+import { observeWorkspaceRpcStub } from './workspaceRpcRecovery'
 
 const OBSERVER_CANCELLED = 'OBSERVER_CONFIG_CANCELLED'
 
@@ -187,9 +188,11 @@ export function useWorkspaceOpen({
 
         overseerStub = authenticatedApi.openGadget(id, shareKey, configureObservers)
         // No onRpcBroken here: a workerd probe showed it never fires for a DO-backed capability
-        // while the session lives (session-teardown only), so recovery rides on call-site
-        // classification via notifyWorkspaceRpcError instead.
-        setOverseer({ stub: overseerStub })
+        // while the session lives (session-teardown only), so the observed capability classifies
+        // every rejected workspace RPC via notifyWorkspaceRpcError instead.
+        setOverseer({
+          stub: observeWorkspaceRpcStub(overseerStub, notifyWorkspaceRpcError, 'workspace'),
+        })
 
         const settledSubscription = await raceOpenSettlement(
           overseerStub.subscribeToMetadata((nextMetadata) => {

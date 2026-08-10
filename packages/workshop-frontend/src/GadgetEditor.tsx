@@ -54,6 +54,7 @@ import { useActions } from './useActions'
 import DeleteConfirmationDialog from './components/DeleteConfirmationDialog'
 import WorkspaceOpenErrorPage from './components/WorkspaceOpenErrorPage'
 import { useWorkspaceOpen } from './useWorkspaceOpen'
+import { observeWorkspaceRpcStub } from './workspaceRpcRecovery'
 import { reportIssue } from './errorReporting'
 import GadgetExportMenu from './GadgetExportMenu'
 
@@ -1115,10 +1116,6 @@ export default function GadgetEditor() {
         sub = s
       })
       .catch(err => {
-        // Notify so a DO reset schedules a workspace reopen; this subscription (and the console
-        // log one below) is mounted for the whole workspace, so recovery doesn't have to wait
-        // for a user action to trip over the dead session.
-        notifyWorkspaceRpcError(err, 'workpieces.subscribe')
         logRpcFailure('Failed to subscribe to workpieces:', err)
       })
     return () => {
@@ -1136,7 +1133,11 @@ export default function GadgetEditor() {
       setGadget(null)
       return
     }
-    const stub = overseer.stub.getGadget(selectedGadgetId)
+    const stub = observeWorkspaceRpcStub(
+      overseer.stub.getGadget(selectedGadgetId),
+      notifyWorkspaceRpcError,
+      'gadget',
+    )
     setGadget({ id: selectedGadgetId, stub })
     return () => { stub[Symbol.dispose]() }
   }, [overseer, selectedGadgetId])
@@ -1184,7 +1185,11 @@ export default function GadgetEditor() {
   const handleRenameWorkpiece = useCallback(async (workpieceId: WorkpieceId, title: string) => {
     if (!overseer) return
     // The subscription delivers the updated summary, so no local state change is needed.
-    const target = overseer.stub.getGadget(workpieceId)
+    const target = observeWorkspaceRpcStub(
+      overseer.stub.getGadget(workpieceId),
+      notifyWorkspaceRpcError,
+      'gadget',
+    )
     try {
       await target.setTitle(title)
     } catch {
@@ -1206,7 +1211,6 @@ export default function GadgetEditor() {
         sub = s
       })
       .catch(err => {
-        notifyWorkspaceRpcError(err, 'console-logs.subscribe')
         logRpcFailure('Failed to subscribe to console logs:', err)
       })
     return () => { cancelled = true; sub?.[Symbol.dispose]() }
@@ -1494,7 +1498,6 @@ export default function GadgetEditor() {
                 <ChatInterface
                   key={id}
                   overseer={overseer.stub}
-                  onWorkspaceRpcError={notifyWorkspaceRpcError}
                   selectedChatId={effectiveSelectedChatId}
                   onNavigateToChat={navigateToChat}
                   onProposedChangesChange={setProposedChanges}
