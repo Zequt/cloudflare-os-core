@@ -102,6 +102,26 @@ describe("getModel AI Gateway routing", () => {
     });
   }, 15000);
 
+  it("routes an explicitly configured custom model directly", async () => {
+    const handle = getModel(env(), {
+      provider: "openai",
+      model: "gpt-5.6-luna",
+      apiToken: "personal-proxy-key",
+      apiUrl: "https://codex-api.example.com/v1",
+    }, INITIATOR, {
+      userGateway: { accountId: "user-account-id", apiKey: "user-token" },
+    });
+
+    expect(handle.model.api).toBe("openai-responses");
+    expect(handle.model.baseUrl).toBe("https://codex-api.example.com/v1");
+    expect(handle.aiGatewayLogRoute).toBeUndefined();
+
+    const request = await captureRequest(handle);
+    expect(request.url).toBe("https://codex-api.example.com/v1/responses");
+    expect(request.headers.get("authorization")).toBe("Bearer personal-proxy-key");
+    expect(request.headers.get("cf-aig-authorization")).toBeNull();
+  }, 15000);
+
   it("routes Google through the gateway's google-ai-studio passthrough", () => {
     // The @google/genai SDK sends its API key as `x-goog-api-key`, which AI Gateway forwards to
     // the provider verbatim (taking precedence over the gateway's stored keys), so the documented
