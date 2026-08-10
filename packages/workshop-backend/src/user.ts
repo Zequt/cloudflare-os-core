@@ -12,6 +12,7 @@ import type { AdminSettings } from "./admin-settings.js";
 import { isReservedBlueprintKey, readBlueprintKvRecord } from "./blueprint-archive.js";
 import { filterEnabledResources, isResourceDisabled, readAdminConfig } from "./admin-config.js";
 import { buildGatekeeperVendorMap } from "./auth/auth-vendors.js";
+import { isDirectModelConfig } from "./ai-model-config.js";
 
 const logger = createWorkshopLogger("workshop.user");
 
@@ -526,7 +527,7 @@ export class UserDurableObject extends DurableObject<Cloudflare.Env> {
 
   async addModel(profile: AiChatAuthorInfo, config: AiModelConfig): Promise<void> {
     let gwConfig = getAiGatewayConfig(this.env);
-    if (gwConfig && !gwConfig.providers.has(config.provider)) {
+    if (gwConfig && !gwConfig.providers.has(config.provider) && !isDirectModelConfig(config)) {
       throw new Error(`Provider "${config.provider}" is not available in AI Gateway mode.`);
     }
 

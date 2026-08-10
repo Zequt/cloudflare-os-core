@@ -4050,6 +4050,7 @@ interface ChatInterfaceProps {
     chatId: number | null,
     options?: { replace?: boolean },
   ) => void;
+  /** Routes RPC failures to workspace-level recovery; returns true for DO resets. */
   onProposedChangesChange?: (proposedChanges: Uint8Array | undefined) => void;
   onDraftProposedChangesChange?: (
     updates: StreamingProposedChanges | undefined,
@@ -5246,7 +5247,9 @@ function ChatInterface({
 
     subscribe();
 
-    // Set up reconnection handling
+    // Socket-level teardown only: onRpcBroken never fires for a DO reset behind a healthy
+    // session (workerd probe — see useWorkspaceOpen), so the subscribe catch above owns that
+    // recovery path through the observed workspace RPC stub.
     overseer.onRpcBroken?.((error) => {
       console.warn("RPC connection broken:", error);
       setIsSubscribed(false);
@@ -5391,7 +5394,7 @@ function ChatInterface({
         );
       }
     } catch (err) {
-      if (!logRpcFailure("Failed to send message:", err, { reportSite: "chat.send" })) {
+      if (!logRpcFailure("Failed to send message:", err)) {
         toasts.add({ title: "Failed to send message", variant: "error" });
       }
       throw err;
@@ -5414,7 +5417,7 @@ function ChatInterface({
           message, model, capsules, attachments, formats);
       onNavigateToChatRef.current(newChatId);
     } catch (err) {
-      if (!logRpcFailure("Failed to create new chat:", err, { reportSite: "chat.new" })) {
+      if (!logRpcFailure("Failed to create new chat:", err)) {
         toasts.add({ title: "Failed to start conversation", variant: "error" });
       }
       throw err;

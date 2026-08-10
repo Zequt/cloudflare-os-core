@@ -61,13 +61,11 @@ function decodeSelection(value: string): SelectionType {
 }
 
 // Build the flat list of options for the Select dropdown.
-function buildOptions(gatewayMode: boolean, enabledProviders: Set<string> | null) {
+export function buildOptions(gatewayMode: boolean) {
   const options: { value: string; label: string; provider: string }[] = []
   const providerOrder = Object.keys(SUGGESTED_MODELS) as AiModelProvider[]
 
   for (const provider of providerOrder) {
-    if (enabledProviders && !enabledProviders.has(provider)) continue
-
     // In gateway mode, suggested models are already built-in, so don't list them.
     if (!gatewayMode) {
       for (const [modelId, model] of Object.entries(SUGGESTED_MODELS[provider])) {
@@ -110,9 +108,6 @@ export default function AddModelModal({ visible, onCancel, onSuccess, authentica
   const [advancedOpen, setAdvancedOpen] = useState(false)
 
   const gatewayMode = aiConfig?.enabled === true
-  const enabledProviders: Set<string> | null = gatewayMode
-    ? new Set(aiConfig.enabledProviders)
-    : null
 
   // Reset all state when dialog closes
   useEffect(() => {
@@ -161,7 +156,7 @@ export default function AddModelModal({ visible, onCancel, onSuccess, authentica
 
     const isOllama = selection?.provider === 'ollama'
     const isCloudflare = selection?.provider === 'cloudflare'
-    const showCredentials = !gatewayMode
+    const showCredentials = !gatewayMode || selection?.type === 'custom'
 
     if (showCredentials && selection && !isOllama && !apiToken.trim()) {
       newErrors.apiToken = 'Please enter your API token'
@@ -173,6 +168,12 @@ export default function AddModelModal({ visible, onCancel, onSuccess, authentica
 
     if (showCredentials && isOllama && !apiUrl.trim()) {
       newErrors.apiUrl = 'Please enter the Ollama API URL'
+    }
+
+    if (gatewayMode && showCredentials && selection && !isOllama && !isCloudflare &&
+        !apiUrl.trim()) {
+      newErrors.apiUrl = 'Please enter the direct API URL'
+      setAdvancedOpen(true)
     }
 
     setErrors(newErrors)
@@ -197,9 +198,9 @@ export default function AddModelModal({ visible, onCancel, onSuccess, authentica
       const config: AiModelConfig = {
         provider: selection!.provider,
         model: finalModelId,
-        apiToken: gatewayMode ? '' : apiToken.trim(),
-        ...(!gatewayMode && accountId.trim() && { accountId: accountId.trim() }),
-        ...(!gatewayMode && apiUrl.trim() && { apiUrl: apiUrl.trim() }),
+        apiToken: showCredentials ? apiToken.trim() : '',
+        ...(showCredentials && accountId.trim() && { accountId: accountId.trim() }),
+        ...(showCredentials && apiUrl.trim() && { apiUrl: apiUrl.trim() }),
       }
 
       await authenticatedApi.addModel(profile, config)
@@ -213,12 +214,12 @@ export default function AddModelModal({ visible, onCancel, onSuccess, authentica
     }
   }
 
-  const options = buildOptions(gatewayMode, enabledProviders)
+  const options = buildOptions(gatewayMode)
   const showCustomFields = selection?.type === 'custom'
   const example = selection ? exampleModel(selection.provider) : null
   const isOllama = selection?.provider === 'ollama'
   const isCloudflare = selection?.provider === 'cloudflare'
-  const showCredentials = !gatewayMode
+  const showCredentials = !gatewayMode || selection?.type === 'custom'
 
   // Group options by provider for rendering with visual separators.
   const groupedOptions: { provider: string; items: typeof options }[] = []
@@ -352,7 +353,9 @@ export default function AddModelModal({ visible, onCancel, onSuccess, authentica
                   placeholder="https://..."
                   description="Override the default API endpoint (useful for proxies like Cloudflare AI Gateway)"
                   value={apiUrl}
-                  onChange={(e) => setApiUrl(e.target.value)}
+                  onChange={(e) => { setApiUrl(e.target.value); setErrors(prev => ({ ...prev, apiUrl: '' })) }}
+                  error={errors.apiUrl}
+                  variant={errors.apiUrl ? 'error' : 'default'}
                 />
               </Collapsible.DefaultPanel>
             </Collapsible.Root>

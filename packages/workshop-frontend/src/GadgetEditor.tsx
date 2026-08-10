@@ -30,6 +30,7 @@ import {
   WorkpiecesSubscriber,
 } from '@gadgets/workshop-shared/api'
 import ObserverConfigModal from './ObserverConfigModal'
+import { logRpcFailure } from './rpcErrors'
 import GadgetCodeInterface from './GadgetCodeInterface'
 import GadgetUI from './GadgetUI'
 import GadgetUseView from './GadgetUseView'
@@ -53,6 +54,7 @@ import { useActions } from './useActions'
 import DeleteConfirmationDialog from './components/DeleteConfirmationDialog'
 import WorkspaceOpenErrorPage from './components/WorkspaceOpenErrorPage'
 import { useWorkspaceOpen } from './useWorkspaceOpen'
+import { observeWorkspaceRpcStub } from './workspaceRpcRecovery'
 import { reportIssue } from './errorReporting'
 import GadgetExportMenu from './GadgetExportMenu'
 
@@ -455,6 +457,7 @@ export default function GadgetEditor() {
     retry: retryOpen,
     cancelObserverConfig,
     updateTitle,
+    notifyWorkspaceRpcError,
   } = useWorkspaceOpen({
     id,
     authenticatedApi,
@@ -1112,7 +1115,9 @@ export default function GadgetEditor() {
         if (cancelled) { s[Symbol.dispose](); return }
         sub = s
       })
-      .catch(err => console.error('Failed to subscribe to workpieces:', err))
+      .catch(err => {
+        logRpcFailure('Failed to subscribe to workpieces:', err)
+      })
     return () => {
       cancelled = true
       subscriber.cancel()
@@ -1128,7 +1133,11 @@ export default function GadgetEditor() {
       setGadget(null)
       return
     }
-    const stub = overseer.stub.getGadget(selectedGadgetId)
+    const stub = observeWorkspaceRpcStub(
+      overseer.stub.getGadget(selectedGadgetId),
+      notifyWorkspaceRpcError,
+      'gadget',
+    )
     setGadget({ id: selectedGadgetId, stub })
     return () => { stub[Symbol.dispose]() }
   }, [overseer, selectedGadgetId])
@@ -1176,7 +1185,11 @@ export default function GadgetEditor() {
   const handleRenameWorkpiece = useCallback(async (workpieceId: WorkpieceId, title: string) => {
     if (!overseer) return
     // The subscription delivers the updated summary, so no local state change is needed.
-    const target = overseer.stub.getGadget(workpieceId)
+    const target = observeWorkspaceRpcStub(
+      overseer.stub.getGadget(workpieceId),
+      notifyWorkspaceRpcError,
+      'gadget',
+    )
     try {
       await target.setTitle(title)
     } catch {
@@ -1197,7 +1210,9 @@ export default function GadgetEditor() {
         if (cancelled) { s[Symbol.dispose](); return }
         sub = s
       })
-      .catch(err => console.error('Failed to subscribe to console logs:', err))
+      .catch(err => {
+        logRpcFailure('Failed to subscribe to console logs:', err)
+      })
     return () => { cancelled = true; sub?.[Symbol.dispose]() }
   }, [overseer])
 
