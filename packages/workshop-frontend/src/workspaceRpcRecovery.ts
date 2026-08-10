@@ -20,11 +20,15 @@ export function observeWorkspaceRpcStub<T extends object>(
   stub: T,
   onError: WorkspaceRpcErrorObserver,
   scope: string,
+  ignoredRemoteMethods: readonly PropertyKey[] = [],
 ): T {
+  const ignored = new Set(ignoredRemoteMethods)
   return new Proxy(stub, {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver)
-      if (typeof value !== 'function' || LOCAL_STUB_METHODS.has(property)) return value
+      if (typeof value !== 'function' || LOCAL_STUB_METHODS.has(property) || ignored.has(property)) {
+        return value
+      }
 
       return (...args: unknown[]) => {
         const result = Reflect.apply(value, target, args) as unknown

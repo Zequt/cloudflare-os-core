@@ -191,7 +191,15 @@ export function useWorkspaceOpen({
         // while the session lives (session-teardown only), so the observed capability classifies
         // every rejected workspace RPC via notifyWorkspaceRpcError instead.
         setOverseer({
-          stub: observeWorkspaceRpcStub(overseerStub, notifyWorkspaceRpcError, 'workspace'),
+          // getGadget returns a child capability that GadgetEditor observes separately. Ignoring
+          // the parent pipeline avoids reporting the same reset for both capability acquisition
+          // and the child operation that actually failed.
+          stub: observeWorkspaceRpcStub(
+            overseerStub,
+            notifyWorkspaceRpcError,
+            'workspace',
+            ['getGadget'],
+          ),
         })
 
         const settledSubscription = await raceOpenSettlement(

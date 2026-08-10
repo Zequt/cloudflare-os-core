@@ -10,6 +10,16 @@ class WorkspaceTarget extends RpcTarget {
   async listChats(): Promise<string[]> {
     return ['chat']
   }
+
+  getGadget(): GadgetTarget {
+    return new GadgetTarget()
+  }
+}
+
+class GadgetTarget extends RpcTarget {
+  async setTitle(): Promise<void> {
+    throw new Error('Durable Object reset because its code was updated.')
+  }
 }
 
 describe('observeWorkspaceRpcStub', () => {
@@ -28,5 +38,23 @@ describe('observeWorkspaceRpcStub', () => {
 
     await expect(stub.listChats()).resolves.toEqual(['chat'])
     expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('reports a pipelined child capability failure only at the child operation', async () => {
+    const sites: string[] = []
+    const onError = vi.fn<(error: unknown, site?: string) => boolean>((_error, site) => {
+      if (site) sites.push(site)
+      return true
+    })
+    const workspace = observeWorkspaceRpcStub(
+      new RpcStub(new WorkspaceTarget()),
+      onError,
+      'workspace',
+      ['getGadget'],
+    )
+    const gadget = observeWorkspaceRpcStub(workspace.getGadget(), onError, 'gadget')
+
+    await expect(gadget.setTitle()).rejects.toThrow('Durable Object reset')
+    expect(sites).toEqual(['gadget.setTitle'])
   })
 })
