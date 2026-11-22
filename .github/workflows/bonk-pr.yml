@@ -9,7 +9,7 @@ jobs:
     if: >-
       github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id &&
       github.event.sender.type != 'Bot'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, zequt-ephemeral-vm, zequt-isolation-vm]
     timeout-minutes: 60
     concurrency:
       group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
